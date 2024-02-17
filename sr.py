@@ -12,7 +12,7 @@ import numpy as np
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', type=str, default='config/sr_sr3_16_128.json',
+    parser.add_argument('-c', '--config', type=str, default='/workspaces/Image-Super-Resolution-via-Iterative-Refinement/config/challenge_16_128.json',
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
@@ -128,10 +128,18 @@ if __name__ == "__main__":
                             lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
                         Metrics.save_img(
                             fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
+                        # Grayscale image, add dimension
+                        if sr_img.ndim == 2:
+                            joined_imgs = np.transpose(np.concatenate(
+                                (fake_img[:,:,None], sr_img[:,:,None], hr_img[:,:,None]), 
+                                axis=1),[2, 0, 1])
+                        else:
+                            joined_imgs = np.transpose(np.concatenate(
+                                (fake_img, sr_img, hr_img), 
+                                axis=1), [2, 0, 1])
                         tb_logger.add_image(
                             'Iter_{}'.format(current_step),
-                            np.transpose(np.concatenate(
-                                (fake_img, sr_img, hr_img), axis=1), [2, 0, 1]),
+                            joined_imgs,
                             idx)
                         avg_psnr += Metrics.calculate_psnr(
                             sr_img, hr_img)

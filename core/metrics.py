@@ -21,7 +21,13 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(-1, 1)):
             math.sqrt(n_img)), normalize=False).numpy()
         img_np = np.transpose(img_np, (1, 2, 0))  # HWC, RGB
     elif n_dim == 3:
-        img_np = tensor.numpy()
+        if tensor.shape[0] == 11:
+            n_img = len(tensor)
+            tensor = tensor[:, None, :, :]
+            img_np = make_grid(tensor, nrow=int(
+                math.sqrt(n_img)), normalize=False).numpy()
+        else:
+            img_np = tensor.numpy()
         img_np = np.transpose(img_np, (1, 2, 0))  # HWC, RGB
     elif n_dim == 2:
         img_np = tensor.numpy()
@@ -35,8 +41,8 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(-1, 1)):
 
 
 def save_img(img, img_path, mode='RGB'):
-    cv2.imwrite(img_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
-    # cv2.imwrite(img_path, img)
+    # cv2.imwrite(img_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    cv2.imwrite(img_path, img)
 
 
 def calculate_psnr(img1, img2):

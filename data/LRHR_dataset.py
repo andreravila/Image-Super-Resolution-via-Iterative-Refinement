@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 import random
 import data.util as Util
 
+import numpy as np
 
 class LRHRDataset(Dataset):
     def __init__(self, dataroot, datatype, l_resolution=16, r_resolution=128, split='train', data_len=-1, need_LR=False):
@@ -85,10 +86,15 @@ class LRHRDataset(Dataset):
                 if self.need_LR:
                     img_LR = Image.open(BytesIO(lr_img_bytes)).convert("RGB")
         else:
-            img_HR = Image.open(self.hr_path[index]).convert("RGB")
-            img_SR = Image.open(self.sr_path[index]).convert("RGB")
+            if self.hr_path[index].endswith('.npy'):
+                img_HR = np.load(self.hr_path[index]).astype(np.float32)
+                img_SR = np.load(self.sr_path[index]).astype(np.float32)
+            else:
+                img_HR = Image.open(self.hr_path[index])#.convert("RGB")
+                img_SR = Image.open(self.sr_path[index])#.convert("RGB")
             if self.need_LR:
-                img_LR = Image.open(self.lr_path[index]).convert("RGB")
+                img_LR = Image.open(self.lr_path[index])#.convert("RGB")
+
         if self.need_LR:
             [img_LR, img_SR, img_HR] = Util.transform_augment(
                 [img_LR, img_SR, img_HR], split=self.split, min_max=(-1, 1))

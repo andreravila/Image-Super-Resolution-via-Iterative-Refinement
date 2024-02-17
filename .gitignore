@@ -130,3 +130,13 @@ dmypy.json
 .pyre/
 
 *.lmdb
+
+downloaded-datasets
+
+dataset*
+
+
+challenge/challenge-dataset
+challenge/testing-challenge*
+challenge/output-dataset*
+challenge/validation-dataset*
