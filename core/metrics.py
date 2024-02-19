@@ -42,6 +42,11 @@ def tensor2img(tensor, out_type=np.uint8, min_max=(-1, 1)):
 
 def save_img(img, img_path, mode='RGB'):
     # cv2.imwrite(img_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+    # If the img comes as not uint8 save also the numpy array, then convert it 
+    # to uint8 and save the image
+    if img.dtype != np.uint8:
+        np.save(img_path.replace('.png', '.npy'), img)
+        img = (img * 255.0).round()
     cv2.imwrite(img_path, img)
 
 
