@@ -114,10 +114,10 @@ if __name__ == "__main__":
                         diffusion.feed_data(val_data)
                         diffusion.test(continous=False)
                         visuals = diffusion.get_current_visuals()
-                        sr_img = Metrics.tensor2img(visuals['SR'], out_type=np.float32)  # uint8
-                        hr_img = Metrics.tensor2img(visuals['HR'], out_type=np.float32)  # uint8
-                        lr_img = Metrics.tensor2img(visuals['LR'], out_type=np.float32)  # uint8
-                        fake_img = Metrics.tensor2img(visuals['INF'], out_type=np.float32)  # uint8
+                        sr_img = Metrics.tensor2img(visuals['SR'], out_type=np.float32)  
+                        hr_img = Metrics.tensor2img(visuals['HR'], out_type=np.float32)  
+                        lr_img = Metrics.tensor2img(visuals['LR'], out_type=np.float32)  
+                        fake_img = Metrics.tensor2img(visuals['INF'], out_type=np.float32)  
 
                         # generation
                         Metrics.save_img(
@@ -141,8 +141,11 @@ if __name__ == "__main__":
                             'Iter_{}'.format(current_step),
                             joined_imgs,
                             idx)
-                        avg_psnr += Metrics.calculate_psnr(
-                            sr_img, hr_img)
+                        
+                        if sr_img.dtype != np.uint8:
+                            avg_psnr += Metrics.calculate_psnr(np.round(255*sr_img), np.round(255*hr_img))
+                        else:
+                            avg_psnr += Metrics.calculate_psnr(sr_img, hr_img)
 
                         if wandb_logger:
                             wandb_logger.log_image(
@@ -193,9 +196,9 @@ if __name__ == "__main__":
             diffusion.test(continous=True)
             visuals = diffusion.get_current_visuals()
 
-            hr_img = Metrics.tensor2img(visuals['HR'], out_type=np.float32)  # uint8
-            lr_img = Metrics.tensor2img(visuals['LR'], out_type=np.float32)  # uint8
-            fake_img = Metrics.tensor2img(visuals['INF'], out_type=np.float32)  # uint8
+            hr_img = Metrics.tensor2img(visuals['HR'], out_type=np.float32)  
+            lr_img = Metrics.tensor2img(visuals['LR'], out_type=np.float32)  
+            fake_img = Metrics.tensor2img(visuals['INF'], out_type=np.float32)  
 
             sr_img_mode = 'grid'
             if sr_img_mode == 'single':
@@ -207,7 +210,7 @@ if __name__ == "__main__":
                         Metrics.tensor2img(sr_img[iter], out_type=np.float32), '{}/{}_{}_sr_{}.png'.format(result_path, current_step, idx, iter))
             else:
                 # grid img
-                sr_img = Metrics.tensor2img(visuals['SR'], out_type=np.float32)  # uint8
+                sr_img = Metrics.tensor2img(visuals['SR'], out_type=np.float32)  
                 Metrics.save_img(
                     sr_img, '{}/{}_{}_sr_process.png'.format(result_path, current_step, idx))
                 Metrics.save_img(
@@ -221,9 +224,13 @@ if __name__ == "__main__":
                 fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
 
             # generation
-            eval_psnr = Metrics.calculate_psnr(Metrics.tensor2img(visuals['SR'][-1], out_type=np.float32), hr_img)
-            eval_ssim = Metrics.calculate_ssim(Metrics.tensor2img(visuals['SR'][-1], out_type=np.float32), hr_img)
-
+            if hr_img.dtype != np.uint8:
+                eval_psnr = Metrics.calculate_psnr(Metrics.tensor2img(visuals['SR'][-1]), np.round(255*hr_img))
+                eval_ssim = Metrics.calculate_ssim(Metrics.tensor2img(visuals['SR'][-1]), np.round(255*hr_img))
+            else:
+                eval_psnr = Metrics.calculate_psnr(Metrics.tensor2img(visuals['SR'][-1]), hr_img)
+                eval_ssim = Metrics.calculate_ssim(Metrics.tensor2img(visuals['SR'][-1]), hr_img)
+            
             avg_psnr += eval_psnr
             avg_ssim += eval_ssim
 
