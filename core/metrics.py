@@ -50,6 +50,14 @@ def save_img(img, img_path, mode='RGB'):
     cv2.imwrite(img_path, img)
 
 
+def save(img, img_path, mode='RGB'):
+    # If the img comes as not uint8 save it as numpy array
+    # else, save it as img
+    if img_path.endswith('.npy'):
+        np.save(img_path, img)
+    else:
+        cv2.imwrite(img_path, img)
+
 def calculate_psnr(img1, img2):
     # img1 and img2 have range [0, 255]
     img1 = img1.astype(np.float64)

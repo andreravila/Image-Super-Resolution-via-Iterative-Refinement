@@ -21,7 +21,7 @@
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 16, // low resolution need to super_resolution
             "r_resolution": 128, // high resolution
-            "batch_size": 16,
+            "batch_size": 4,
             "num_workers": 16,
             "use_shuffle": true,
             "data_len": -1 // -1 represents all data used in train
@@ -30,11 +30,13 @@
             "name": "ChallengeValidate",
             "mode": "HR",
             //"dataroot": "dataset/testing-challenge_16_128/validate",
-            "dataroot": "dataset-final/slices-dataset/validate",
+            "dataroot": "dataset-final/slices-dataset/validate-real",
+            "val_out_dir": "dataset-final/slices-dataset/validate_out_sr3",
+            "val_out_suffix": "npy",
             "datatype": "img", //lmdb or img, path of img files
             "l_resolution": 16,
             "r_resolution": 128,
-            "data_len": 5 // data length in validation 
+            "data_len": -1 // data length in validation 
         }
     },
     "model": {

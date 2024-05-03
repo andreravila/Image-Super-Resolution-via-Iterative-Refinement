@@ -9,6 +9,7 @@ from core.wandb_logger import WandbLogger
 from tensorboardX import SummaryWriter
 import os
 import numpy as np
+import data.util as Util
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -16,12 +17,12 @@ if __name__ == "__main__":
                         help='JSON file for configuration')
     parser.add_argument('-p', '--phase', type=str, choices=['train', 'val'],
                         help='Run either train(training) or val(generation)', default='train')
+    parser.add_argument('--val_real', type=str, choices=['True', 'False'], default='False')
     parser.add_argument('-gpu', '--gpu_ids', type=str, default=None)
     parser.add_argument('-debug', '-d', action='store_true')
     parser.add_argument('-enable_wandb', action='store_true')
     parser.add_argument('-log_wandb_ckpt', action='store_true')
     parser.add_argument('-log_eval', action='store_true')
-
     # parse configs
     args = parser.parse_args()
     opt = Logger.parse(args)
@@ -60,6 +61,12 @@ if __name__ == "__main__":
             val_set = Data.create_dataset(dataset_opt, phase)
             val_loader = Data.create_dataloader(
                 val_set, dataset_opt, phase)
+            val_indexes = Util.get_paths_from_images(
+                '{}/sr_{}_{}'.format(dataset_opt['dataroot'], dataset_opt['l_resolution'], dataset_opt['r_resolution']))
+            for i in range(len(val_indexes)):
+                val_indexes[i] = os.path.basename(val_indexes[i])
+                val_indexes[i], _ = os.path.splitext(val_indexes[i])
+
     logger.info('Initial Dataset Finished')
 
     # model
@@ -109,25 +116,32 @@ if __name__ == "__main__":
 
                     diffusion.set_new_noise_schedule(
                         opt['model']['beta_schedule']['val'], schedule_phase='val')
+                    
+                    val_out_suffix = opt['datasets']['val']['val_out_suffix']
+                    if val_out_suffix == "npy":
+                        val_out_type = np.float32
+                    else:
+                        val_out_type = np.uint8
+                    
                     for _,  val_data in enumerate(val_loader):
                         idx += 1
                         diffusion.feed_data(val_data)
                         diffusion.test(continous=False)
                         visuals = diffusion.get_current_visuals()
-                        sr_img = Metrics.tensor2img(visuals['SR'], out_type=np.float32)  
-                        hr_img = Metrics.tensor2img(visuals['HR'], out_type=np.float32)  
-                        lr_img = Metrics.tensor2img(visuals['LR'], out_type=np.float32)  
-                        fake_img = Metrics.tensor2img(visuals['INF'], out_type=np.float32)  
+                        sr_img = Metrics.tensor2img(visuals['SR'], out_type=val_out_type)  
+                        hr_img = Metrics.tensor2img(visuals['HR'], out_type=val_out_type)  
+                        lr_img = Metrics.tensor2img(visuals['LR'], out_type=val_out_type)  
+                        fake_img = Metrics.tensor2img(visuals['INF'], out_type=val_out_type)  
 
                         # generation
-                        Metrics.save_img(
-                            hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
-                        Metrics.save_img(
-                            sr_img, '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
-                        Metrics.save_img(
-                            lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
-                        Metrics.save_img(
-                            fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
+                        Metrics.save(
+                            hr_img, '{}/{}_{}_hr.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
+                        Metrics.save(
+                            sr_img, '{}/{}_{}_sr.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
+                        Metrics.save(
+                            lr_img, '{}/{}_{}_lr.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
+                        Metrics.save(
+                            fake_img, '{}/{}_{}_inf.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
                         # Grayscale image, add dimension
                         if sr_img.ndim == 2:
                             joined_imgs = np.transpose(np.concatenate(
@@ -188,40 +202,60 @@ if __name__ == "__main__":
         avg_psnr = 0.0
         avg_ssim = 0.0
         idx = 0
-        result_path = '{}'.format(opt['path']['results'])
+        
+        val_real = bool(args.val_real)
+        if val_real == True:
+            result_path = opt['datasets']['val']['val_out_dir']
+        else:
+            result_path = '{}'.format(opt['path']['results'])        
         os.makedirs(result_path, exist_ok=True)
+
+        val_out_suffix = opt['datasets']['val']['val_out_suffix']
+        if val_out_suffix == "npy":
+            val_out_type = np.float32
+        else:
+            val_out_type = np.uint8
+        
         for _,  val_data in enumerate(val_loader):
             idx += 1
             diffusion.feed_data(val_data)
             diffusion.test(continous=True)
             visuals = diffusion.get_current_visuals()
 
-            hr_img = Metrics.tensor2img(visuals['HR'], out_type=np.float32)  
-            lr_img = Metrics.tensor2img(visuals['LR'], out_type=np.float32)  
-            fake_img = Metrics.tensor2img(visuals['INF'], out_type=np.float32)  
-
-            sr_img_mode = 'grid'
-            if sr_img_mode == 'single':
-                # single img series
-                sr_img = visuals['SR']  # uint8
-                sample_num = sr_img.shape[0]
-                for iter in range(0, sample_num):
-                    Metrics.save_img(
-                        Metrics.tensor2img(sr_img[iter], out_type=np.float32), '{}/{}_{}_sr_{}.png'.format(result_path, current_step, idx, iter))
+            if val_real == True:
+                    
+                    sr_img = Metrics.tensor2img(visuals['SR'][-1], out_type=val_out_type)
+                    hr_img = Metrics.tensor2img(visuals['HR'], out_type=val_out_type)
+                    Metrics.save(sr_img, '{}/{}_sr3.{}'.format(result_path, val_indexes[idx-1], val_out_suffix))
             else:
-                # grid img
-                sr_img = Metrics.tensor2img(visuals['SR'], out_type=np.float32)  
-                Metrics.save_img(
-                    sr_img, '{}/{}_{}_sr_process.png'.format(result_path, current_step, idx))
-                Metrics.save_img(
-                    Metrics.tensor2img(visuals['SR'][-1], out_type=np.float32), '{}/{}_{}_sr.png'.format(result_path, current_step, idx))
 
-            Metrics.save_img(
-                hr_img, '{}/{}_{}_hr.png'.format(result_path, current_step, idx))
-            Metrics.save_img(
-                lr_img, '{}/{}_{}_lr.png'.format(result_path, current_step, idx))
-            Metrics.save_img(
-                fake_img, '{}/{}_{}_inf.png'.format(result_path, current_step, idx))
+                sr_img_mode = 'grid'
+                if sr_img_mode == 'single':
+                    # single img series
+                    sr_img = visuals['SR']  # uint8
+                    sample_num = sr_img.shape[0]
+                    for iter in range(0, sample_num):
+                        Metrics.save(
+                            Metrics.tensor2img(sr_img[iter], out_type=val_out_type), '{}/{}_{}_sr_{}.{}'.format(result_path, current_step, val_indexes[idx-1], iter, val_out_suffix))
+                else:
+                    # grid img
+                    sr_img = Metrics.tensor2img(visuals['SR'], out_type=val_out_type)  
+                    Metrics.save(
+                        sr_img, '{}/{}_{}_sr_process.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
+                    Metrics.save(
+                        Metrics.tensor2img(visuals['SR'][-1], out_type=val_out_type), '{}/{}_{}_sr.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
+
+
+                hr_img = Metrics.tensor2img(visuals['HR'], out_type=val_out_type)
+                lr_img = Metrics.tensor2img(visuals['LR'], out_type=val_out_type)  
+                fake_img = Metrics.tensor2img(visuals['INF'], out_type=val_out_type)  
+
+                Metrics.save(
+                    hr_img, '{}/{}_{}_hr.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
+                Metrics.save(
+                    lr_img, '{}/{}_{}_lr.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
+                Metrics.save(
+                    fake_img, '{}/{}_{}_inf.{}'.format(result_path, current_step, val_indexes[idx-1], val_out_suffix))
 
             # generation
             if hr_img.dtype != np.uint8:
@@ -235,7 +269,7 @@ if __name__ == "__main__":
             avg_ssim += eval_ssim
 
             if wandb_logger and opt['log_eval']:
-                wandb_logger.log_eval_data(fake_img, Metrics.tensor2img(visuals['SR'][-1], out_type=np.float32), hr_img, eval_psnr, eval_ssim)
+                wandb_logger.log_eval_data(fake_img, Metrics.tensor2img(visuals['SR'][-1], out_type=val_out_type), hr_img, eval_psnr, eval_ssim)
 
         avg_psnr = avg_psnr / idx
         avg_ssim = avg_ssim / idx
